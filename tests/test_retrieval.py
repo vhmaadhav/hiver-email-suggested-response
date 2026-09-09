@@ -108,3 +108,37 @@ def test_include_subject_flag_changes_the_indexed_text():
 
     without = TfidfRetriever(pairs, include_subject=False, min_df=1)
     assert without.retrieve("pipeline nomination", top_k=1) == []
+
+
+# --- retriever factory ----------------------------------------------------
+def test_build_retriever_returns_tfidf_by_default(synthetic_pairs):
+    from hiver_email.retrieval import build_retriever
+
+    r = build_retriever(synthetic_pairs)
+    assert isinstance(r, TfidfRetriever)
+    assert r.retrieve("gas pipeline capacity nomination", top_k=1)
+
+
+def test_build_retriever_rejects_unknown_kind(synthetic_pairs):
+    from hiver_email.retrieval import build_retriever
+
+    with pytest.raises(ValueError, match="unknown retriever"):
+        build_retriever(synthetic_pairs, kind="faiss")
+
+
+def test_hybrid_alpha_must_be_a_convex_weight(synthetic_pairs):
+    from hiver_email.retrieval import HybridRetriever
+
+    with pytest.raises(ValueError, match="alpha"):
+        HybridRetriever(synthetic_pairs, alpha=1.5)
+
+
+def test_top_k_from_scores_sorts_and_drops_zeros(synthetic_pairs):
+    """The shared ranking helper must never pad results with zero-score hits."""
+    import numpy as np
+
+    from hiver_email.retrieval import _top_k_from_scores
+
+    scores = np.array([0.0, 0.9, 0.3, 0.0, 0.6], dtype=np.float32)
+    hits = _top_k_from_scores(synthetic_pairs[:5], scores, top_k=4)
+    assert [round(h.similarity, 1) for h in hits] == [0.9, 0.6, 0.3]

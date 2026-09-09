@@ -1,0 +1,29 @@
+{
+  "metric": "overall_score",
+  "labels": [
+    "tfidf",
+    "hybrid"
+  ],
+  "n_paired": 39,
+  "n_scored": {
+    "tfidf": 39,
+    "hybrid": 40
+  },
+  "mean_tfidf": 61.65,
+  "mean_hybrid": 63.29,
+  "paired_mean_difference": 1.65,
+  "paired_sd_of_difference": 25.78,
+  "standard_error": 4.13,
+  "t_statistic": 0.4,
+  "ci95": [
+    -6.44,
+    9.74
+  ],
+  "per_example": {
+    "better": 20,
+    "worse": 19,
+    "tie": 0
+  },
+  "identical_retrieval": 4,
+  "conclusion": "difference is not distinguishable from noise at this sample size"
+}

@@ -38,7 +38,7 @@ from hiver_email.evaluation import (  # noqa: E402
 from hiver_email.generator import SuggestedReplyGenerator  # noqa: E402
 from hiver_email.judge import RubricJudge  # noqa: E402
 from hiver_email.llm import LLMClient  # noqa: E402
-from hiver_email.retrieval import TfidfRetriever, baseline_reply  # noqa: E402
+from hiver_email.retrieval import baseline_reply, build_retriever  # noqa: E402
 from hiver_email.schemas import (  # noqa: E402
     JUDGE_WEIGHTS,
     ResponseScore,
@@ -55,6 +55,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--seed", type=int, default=DEFAULT_SEED)
     p.add_argument("--test-fraction", type=float, default=DEFAULT_TEST_FRACTION)
     p.add_argument("--top-k", type=int, default=3)
+    p.add_argument("--retriever", default="tfidf", choices=["tfidf", "dense", "hybrid"],
+                   help="tfidf is the default and produced the committed results")
+    p.add_argument("--alpha", type=float, default=0.5,
+                   help="hybrid only: weight on the dense score")
     p.add_argument("--no-baseline", action="store_true",
                    help="skip the retrieval-only baseline (halves judge cost)")
     p.add_argument("--workers", type=int, default=6,
@@ -85,10 +89,12 @@ def main() -> int:
         raise SystemExit(f"FATAL: {len(leaked)} eval examples are in the corpus: {leaked[:5]}")
     print("  leakage check: OK (no held-out example is in the retrieval corpus)")
 
-    print("Building TF-IDF index ...")
-    retriever = TfidfRetriever(corpus, include_subject=True)
-    print(f"  indexed {retriever.size} historical emails, "
-          f"vocab {len(retriever.vectorizer.vocabulary_)}")
+    print(f"Building {args.retriever} index ...")
+    retriever = build_retriever(
+        corpus, kind=args.retriever, include_subject=True, alpha=args.alpha,
+        cache_dir=str(ROOT / ".cache" / "embeddings"),
+    )
+    print(f"  indexed {retriever.size} historical emails")
 
     client = LLMClient()
     generator = SuggestedReplyGenerator(retriever, client, top_k=args.top_k)
@@ -219,6 +225,8 @@ def main() -> int:
             "seed": args.seed,
             "test_fraction": args.test_fraction,
             "top_k": args.top_k,
+            "retriever": args.retriever,
+            "hybrid_alpha": args.alpha if args.retriever == "hybrid" else None,
             "workers": args.workers,
             "n_pairs_total": len(pairs),
             "n_corpus": len(corpus),

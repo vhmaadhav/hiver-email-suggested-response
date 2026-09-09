@@ -1,0 +1,49 @@
+{
+  "n_examples": 40,
+  "main_mean_overall_score": 63.4245,
+  "main_mean_judge_score": 75.25,
+  "main_mean_semantic_similarity": 35.8337,
+  "main_acceptable_rate": 0.8,
+  "main_critical_error_rate": 0.225,
+  "main_per_dimension_mean_1_to_5": {
+    "task_fulfillment": 4.15,
+    "action_alignment": 3.625,
+    "completeness": 4.075,
+    "tone": 4.75
+  },
+  "main_n_failed": 0,
+  "baseline_mean_overall_score": 10.1273,
+  "baseline_mean_judge_score": 3.4375,
+  "baseline_mean_semantic_similarity": 25.7387,
+  "baseline_acceptable_rate": 0.0,
+  "baseline_critical_error_rate": 0.95,
+  "main_minus_baseline": 53.2972,
+  "human_validation": null,
+  "config": {
+    "gen_model": "openai/gpt-oss-20b",
+    "judge_model": "openai/gpt-oss-20b",
+    "same_model_for_gen_and_judge": true,
+    "semantic_backend": "sentence-transformers",
+    "semantic_model": "sentence-transformers/all-MiniLM-L6-v2",
+    "seed": 13,
+    "test_fraction": 0.2,
+    "top_k": 3,
+    "retriever": "hybrid",
+    "hybrid_alpha": 0.5,
+    "workers": 10,
+    "n_pairs_total": 11914,
+    "n_corpus": 9531,
+    "n_heldout_pool": 2383,
+    "judge_weights": {
+      "task_fulfillment": 0.35,
+      "action_alignment": 0.3,
+      "completeness": 0.2,
+      "tone": 0.15
+    },
+    "overall_weights": {
+      "semantic": 0.3,
+      "judge": 0.7
+    },
+    "runtime_seconds": 314.8
+  }
+}

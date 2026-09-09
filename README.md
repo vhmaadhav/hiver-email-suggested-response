@@ -163,8 +163,41 @@ identifiers that an embedding blurs.
 tuned, dense costs a 152 s one-time CPU encode, and the headline results in this
 README were measured with TF-IDF. Promoting hybrid to default without re-running
 the full end-to-end evaluation would mean reporting numbers the configuration did
-not produce. The honest next step is a full `run_eval.py --retriever hybrid`
-comparison, not a default change on the strength of a proxy metric.
+not produce. That full `run_eval.py --retriever hybrid` comparison was then run — see
+immediately below, where the proxy metric's verdict does not survive contact
+with the end-to-end test.
+
+
+### Measured end-to-end: hybrid retrieval did NOT beat TF-IDF
+
+The proxy metric above favoured hybrid, so it was run end to end
+(`run_eval.py --retriever hybrid`, results in
+[`results/hybrid/`](results/hybrid/)) and compared **paired by `example_id`**,
+because the two runs did not score an identical set — comparing raw means would
+have mixed the effect with which examples happened to succeed.
+
+| | TF-IDF | Hybrid |
+|---|---:|---:|
+| Overall (paired, n=39) | 61.65 | 63.29 |
+| Judge score | 72.5 | 75.2 |
+| Acceptable rate | 77% | 80% |
+| Critical-error rate | 23% | 22% |
+
+Paired difference **+1.65**, 95% CI **[-6.44, +9.74]**, t = 0.4.
+Per example: **20 better, 19 worse** — and retrieval actually changed on
+35 of 39 examples, so this is not a case of the two systems
+quietly doing the same thing.
+
+**Conclusion: difference is not distinguishable from noise at this sample size.** Hybrid retrieval changed *which* emails were
+retrieved on nearly every example and the outcome was a coin flip. On this
+evidence it does not ship, and TF-IDF stays the default.
+
+This is the clearest demonstration of why the harness exists. The proxy metric
+said hybrid was better; the end-to-end paired test said the improvement is
+indistinguishable from noise at n=40. Reporting `63.3 > 61.6` as an
+improvement would have been technically accurate and substantively wrong. The
+right next step is more examples, not a default change — the CI is
+±8 points wide, which is exactly the underpowered-sample tradeoff named in §14.
 
 
 ## 6. Baseline

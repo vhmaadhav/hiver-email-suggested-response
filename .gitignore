@@ -35,3 +35,4 @@ eval_run.log
 # embedding cache
 .cache/
 retrieval_bench.log
+hybrid_run.log
