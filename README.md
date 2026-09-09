@@ -124,6 +124,49 @@ The retrieved pairs go into the prompt as guidance. The prompt instructs the mod
 
 **Retrieval quality is genuinely limited** — typical top-1 cosine on this corpus is ~0.2. Enron's vocabulary is broad and TF-IDF is lexical. This is a known ceiling, visible in the per-response similarity scores, and the honest first upgrade would be dense retrieval.
 
+### Measured: does dense retrieval actually help? (`scripts/compare_retrievers.py`)
+
+TF-IDF's ~0.2 top-1 cosine looked like the binding constraint, so dense and hybrid
+retrieval were added as **opt-in** alternatives (`--retriever dense|hybrid`) and
+measured. The metric needs no LLM calls: embed the held-out gold reply and the
+replies attached to the retrieved neighbours, and measure cosine between them.
+A retriever earns its keep when the neighbours it surfaces *were answered the way
+this email needs to be answered*.
+
+Measured over **150 held-out queries**, read from
+[`results/retrieval_comparison.json`](results/retrieval_comparison.json):
+
+| Retriever | reply-sim top-1 | reply-sim best@3 | query-sim top-1 | index build |
+|---|---:|---:|---:|---:|
+| `tfidf` | 24.9 | 34.2 | 34.1 | 1.3s |
+| `dense` | 25.5 | 35.4 | 61.1 | 152.2s |
+| `hybrid` | 28.3 | 36.9 | 44.3 | 8.4s |
+
+**The headline is the gap between the last two columns.** Dense retrieval finds
+*far* more similar emails — query similarity jumps 34 → 61, a
+79% improvement — and yet the replies attached to those emails are barely
+more useful (24.9 → 25.5). Retrieving a better-matching *question* did not
+retrieve a better-matching *answer*.
+
+That is worth stating plainly: **the ceiling here is not mostly a retrieval-model
+problem.** Two emails can ask nearly the same thing and receive completely
+different replies, because the reply depends on thread history, attachments and
+context outside the corpus (§3). Swapping in a stronger embedding model does not
+recover information the dataset never contained.
+
+Hybrid is nonetheless the best of the three on the metric that matters
+(28.3, +3.4 over TF-IDF), which fits the intuition that lexical and
+semantic retrieval fail differently — TF-IDF keeps exact contract names and
+identifiers that an embedding blurs.
+
+**Why TF-IDF remains the default.** The gain is real but modest, `alpha` was not
+tuned, dense costs a 152 s one-time CPU encode, and the headline results in this
+README were measured with TF-IDF. Promoting hybrid to default without re-running
+the full end-to-end evaluation would mean reporting numbers the configuration did
+not produce. The honest next step is a full `run_eval.py --retriever hybrid`
+comparison, not a default change on the strength of a proxy metric.
+
+
 ## 6. Baseline
 
 `new email → nearest TF-IDF historical email → return that human reply verbatim.`
