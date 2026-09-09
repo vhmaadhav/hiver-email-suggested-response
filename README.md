@@ -57,6 +57,13 @@ uv run python scripts/run_eval.py --eval-n 40
 uv run pytest
 ```
 
+**Optional web UI** (not part of the graded evaluation path — a plain `uv sync`
+installs no web framework):
+
+```bash
+uv run --extra ui uvicorn ui.server:app --port 8000
+```
+
 `run_eval.py` writes [`results/per_response.csv`](results/per_response.csv) and [`results/metrics.json`](results/metrics.json) and prints the table above. Useful flags: `--workers N` (parallel LLM calls, default 6), `--eval-n N`, `--seed N`, `--no-baseline`.
 
 ---
