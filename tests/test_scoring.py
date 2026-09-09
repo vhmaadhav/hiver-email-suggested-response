@@ -247,3 +247,57 @@ def test_generator_keeps_a_normal_reply_untouched(synthetic_pairs):
     client = fake_client("Thanks for the note. I'll send the deck tonight.")
     gen = SuggestedReplyGenerator(TfidfRetriever(synthetic_pairs), client)
     assert gen.generate("send the deck").reply == "Thanks for the note. I'll send the deck tonight."
+
+
+# --- truncated-JSON salvage ----------------------------------------------
+TRUNCATED = (
+    '{"task_fulfillment":5,"action_alignment":2,"completeness":4,"tone":5,'
+    '"critical_error":false,"acceptable":true,"reason":"The reply acknowledges '
+    "the adjustments and offers to review and confirm, but it "
+)
+
+
+def test_salvage_recovers_a_verdict_truncated_mid_reason():
+    """The exact failure observed in the measured run must now survive."""
+    payload = parse_json_object(TRUNCATED)
+    verdict = coerce_verdict(payload)
+    assert verdict.task_fulfillment == 5
+    assert verdict.action_alignment == 2
+    assert verdict.acceptable is True
+    assert verdict.score_100() == pytest.approx(
+        0.35 * 100 + 0.30 * 25 + 0.20 * 75 + 0.15 * 100
+    )
+
+
+def test_salvage_never_invents_missing_rubric_scores():
+    """Repair recovers what the model emitted - it must not fill in blanks."""
+    partial = '{"task_fulfillment":5,"reason":"looked fine but '
+    with pytest.raises(ValidationError):
+        coerce_verdict(parse_json_object(partial))
+
+
+def test_salvage_does_not_rescue_non_json():
+    for junk in ("I cannot evaluate this reply.", "", "   "):
+        with pytest.raises(ValueError):
+            parse_json_object(junk)
+
+
+def test_salvage_leaves_wellformed_json_untouched():
+    assert parse_json_object(json.dumps(VALID)) == VALID
+
+
+def test_judge_retries_once_before_giving_up():
+    """First response unusable, second valid -> a real verdict, not a default."""
+    client = fake_client("unusable")
+    client.complete.side_effect = ["not json at all", json.dumps(VALID)]
+    verdict = RubricJudge(client).judge("incoming", "human", "candidate", [])
+    assert verdict.task_fulfillment == 4
+    assert client.complete.call_count == 2
+
+
+def test_judge_raises_when_both_attempts_fail():
+    client = fake_client("unusable")
+    client.complete.side_effect = ["still not json", "also not json"]
+    with pytest.raises(ValueError, match="unusable output twice"):
+        RubricJudge(client).judge("incoming", "human", "candidate", [])
+    assert client.complete.call_count == 2

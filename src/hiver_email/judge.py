@@ -7,6 +7,8 @@ into a paraphrase detector and we lose the whole point of the rubric.
 
 from __future__ import annotations
 
+from pydantic import ValidationError
+
 from .llm import LLMClient, LLMError, parse_json_object
 from .schemas import JudgeVerdict, RetrievedExample, coerce_verdict
 
@@ -40,7 +42,9 @@ after at most trivial edits.
 Return ONLY a JSON object with exactly these keys:
 {"task_fulfillment": int, "action_alignment": int, "completeness": int,
  "tone": int, "critical_error": bool, "acceptable": bool, "reason": string}
-"reason" must be one or two concise sentences."""
+"reason" must be ONE sentence of at most 25 words. Keep it short: a long
+reason risks being cut off by the token limit, which invalidates the whole
+verdict."""
 
 MAX_CHARS = 1500
 
@@ -106,16 +110,24 @@ class RubricJudge:
         prompt = build_judge_prompt(
             incoming_email, human_reply, candidate_reply, retrieved or []
         )
-        raw = self.client.complete(
-            system=JUDGE_SYSTEM_PROMPT,
-            user=prompt,
-            model=self.client.judge_model,
-            temperature=self.temperature,
-            max_tokens=1200,
-            json_mode=True,
-        )
-        payload = parse_json_object(raw)  # ValueError on malformed output
-        return coerce_verdict(payload)  # pydantic ValidationError on bad ranges
+        last: Exception | None = None
+        # One retry with a wider ceiling: the observed failure mode is a verdict
+        # truncated mid-`reason`, which a second attempt usually clears. We
+        # still raise if both attempts fail - never a defaulted score.
+        for max_tokens in (1200, 2400):
+            raw = self.client.complete(
+                system=JUDGE_SYSTEM_PROMPT,
+                user=prompt,
+                model=self.client.judge_model,
+                temperature=self.temperature,
+                max_tokens=max_tokens,
+                json_mode=True,
+            )
+            try:
+                return coerce_verdict(parse_json_object(raw))
+            except (ValueError, ValidationError) as exc:
+                last = exc
+        raise ValueError(f"judge returned unusable output twice: {last}")
 
 
 __all__ = ["RubricJudge", "build_judge_prompt", "JUDGE_SYSTEM_PROMPT", "LLMError"]

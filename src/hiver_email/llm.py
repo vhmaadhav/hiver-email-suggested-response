@@ -133,6 +133,37 @@ def _rejects_json_mode(exc: Exception) -> bool:
 _JSON_BLOCK = re.compile(r"\{.*\}", re.DOTALL)
 
 
+def salvage_truncated_json(text: str) -> dict[str, Any] | None:
+    """Recover a verdict whose trailing string field was cut off mid-write.
+
+    A reasoning model that hits its token ceiling part-way through the final
+    `reason` string leaves every numeric field intact and only the prose
+    unfinished. Closing the open string and the open braces recovers real
+    measured values; it invents nothing, because anything still missing after
+    the repair fails schema validation and is rejected upstream.
+
+    Returns None when the text is not a recoverable truncation.
+    """
+    start = text.find("{")
+    if start == -1:
+        return None
+    body = text[start:].rstrip()
+    # An odd number of unescaped quotes means a string is still open.
+    if len(re.findall(r'(?<!\\)"', body)) % 2:
+        body += '"'
+    # Drop a trailing comma or a key whose value never arrived.
+    body = re.sub(r',\s*"[^"]*"\s*:?\s*$', "", body).rstrip().rstrip(",")
+    depth = body.count("{") - body.count("}")
+    if depth <= 0:
+        return None  # not a truncation - a different problem
+    body += "}" * depth
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
 def parse_json_object(text: str) -> dict[str, Any]:
     """Decode a JSON object from a model response.
 
@@ -150,9 +181,17 @@ def parse_json_object(text: str) -> dict[str, Any]:
         payload = json.loads(cleaned)
     except json.JSONDecodeError:
         match = _JSON_BLOCK.search(cleaned)
-        if not match:
-            raise ValueError(f"no JSON object found in judge response: {text[:200]!r}")
-        payload = json.loads(match.group(0))  # may raise - intentional
+        if match:
+            payload = json.loads(match.group(0))  # may raise - intentional
+        else:
+            # Last resort: a verdict cut off mid-string by the token ceiling.
+            # Repair recovers only fields the model actually emitted; if the
+            # rubric scores are missing, schema validation still rejects it.
+            payload = salvage_truncated_json(cleaned)
+            if payload is None:
+                raise ValueError(
+                    f"no JSON object found in judge response: {text[:200]!r}"
+                )
     if not isinstance(payload, dict):
         raise ValueError(f"judge returned {type(payload).__name__}, expected object")
     return payload

@@ -31,3 +31,7 @@ Thumbs.db
 
 # local run logs
 eval_run.log
+
+# embedding cache
+.cache/
+retrieval_bench.log
