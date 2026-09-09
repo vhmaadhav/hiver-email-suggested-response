@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Retrieval-grounded suggested email responses with transparent historical grounding.">
+  <title>Suggested Email Response</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="page-header">
+      <div>
+        <h1>Suggested Email Response</h1>
+        <p>Retrieval-grounded drafting over <span id="corpus-size">—</span> historical emails.</p>
+      </div>
+      <span id="model-chip" class="model-chip" aria-label="Generation model">Connecting…</span>
+    </header>
+
+    <section class="composer" aria-labelledby="email-label">
+      <label id="email-label" for="email-input">Incoming email</label>
+      <textarea id="email-input" rows="6" placeholder="Paste an incoming email…" spellcheck="true"></textarea>
+      <div class="composer-actions">
+        <button id="generate-button" class="primary" type="button">Generate reply</button>
+        <button id="example-button" class="link-button" type="button">Load an example</button>
+        <span class="shortcut">Ctrl/⌘ + Enter</span>
+      </div>
+      <div id="request-status" class="request-status" role="status" aria-live="polite"></div>
+      <div id="error-row" class="error-row" role="alert" hidden></div>
+    </section>
+
+    <section class="results" aria-labelledby="results-heading">
+      <div class="section-heading">
+        <h2 id="results-heading">Response</h2>
+        <span id="elapsed" class="metadata"></span>
+      </div>
+      <div id="empty-state" class="empty-state">Generate a reply to compare the grounded draft with the nearest historical response.</div>
+      <div id="result-grid" class="result-grid" hidden>
+        <article class="reply-pane suggested-pane">
+          <div class="pane-heading">
+            <h3>Suggested reply</h3>
+            <button id="copy-button" class="small-button" type="button">Copy</button>
+          </div>
+          <p id="suggested-reply" class="reply-text"></p>
+        </article>
+        <article class="reply-pane baseline-pane">
+          <h3>Baseline: nearest historical reply</h3>
+          <p id="baseline-reply" class="reply-text"></p>
+          <p class="caption">Copied verbatim from the closest match — shown for comparison.</p>
+        </article>
+      </div>
+    </section>
+
+    <details id="grounding" class="grounding" hidden>
+      <summary>Grounding — <span id="grounding-count">0</span> retrieved emails</summary>
+      <div id="grounding-list" class="grounding-list"></div>
+    </details>
+
+    <section id="evaluation" class="evaluation" hidden aria-labelledby="evaluation-heading">
+      <div class="evaluation-action">
+        <div>
+          <h2 id="evaluation-heading">Evaluate this reply</h2>
+          <p id="evaluation-note">Rubric evaluation is available for held-out examples with a known human reply.</p>
+        </div>
+        <button id="evaluate-button" class="secondary" type="button">Evaluate this reply</button>
+      </div>
+      <div id="judge-error" class="error-row" role="alert" hidden></div>
+      <div id="verdict" hidden>
+        <div id="critical-warning" class="critical-warning" hidden>Critical error — score capped at 40.</div>
+        <div class="score-line"><span>Judge score</span><strong id="judge-score" class="score-number"></strong></div>
+        <div id="rubric-bars" class="rubric-bars"></div>
+        <p id="judge-reason" class="judge-reason"></p>
+      </div>
+    </section>
+
+    <footer id="metrics-line" class="metrics-line" hidden></footer>
+  </main>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
