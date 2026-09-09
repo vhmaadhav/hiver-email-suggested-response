@@ -1,0 +1,30 @@
+# secrets
+.env
+.env.local
+*.key
+kaggle.json
+
+# data (redownload with scripts/fetch_data.py)
+data/*
+!data/README.md
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# model caches
+.cache/
+*.safetensors
+
+# os / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
