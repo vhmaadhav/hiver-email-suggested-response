@@ -53,12 +53,28 @@ def load_config() -> LLMConfig:
 class LLMClient:
     """Chat-completions wrapper with bounded retries."""
 
-    def __init__(self, config: LLMConfig | None = None, max_retries: int = 3) -> None:
+    def __init__(
+        self,
+        config: LLMConfig | None = None,
+        max_retries: int = 3,
+        timeout: float | None = None,
+    ) -> None:
         from openai import OpenAI  # imported lazily so tests can run without network
 
         self.config = config or load_config()
         self.max_retries = max_retries
-        self._client = OpenAI(api_key=self.config.api_key, base_url=self.config.base_url)
+        # A bounded per-request timeout matters more than it looks: the SDK
+        # default is 10 minutes, so one stalled endpoint can hold a worker
+        # thread long enough to stall a whole evaluation run.
+        self.timeout = timeout if timeout is not None else float(
+            os.environ.get("LLM_TIMEOUT_SECONDS", "90")
+        )
+        self._client = OpenAI(
+            api_key=self.config.api_key,
+            base_url=self.config.base_url,
+            timeout=self.timeout,
+            max_retries=0,  # retries are handled here, with our own backoff
+        )
 
     @property
     def gen_model(self) -> str:

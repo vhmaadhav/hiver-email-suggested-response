@@ -181,6 +181,61 @@ order never leaks into the report.
 
 ---
 
+## 12. A full evaluation run stalled indefinitely
+
+**Symptom.** The first 40-example run sat for 16 minutes having produced no
+output and only 4 seconds of CPU time. Nothing had been written to `results/`.
+Expected runtime was ~5 minutes.
+
+**Cause.** `LLMClient` created the OpenAI client without a `timeout`. The SDK
+default is **600 seconds**, so a single stalled request could hold a worker
+thread for ten minutes — and with several stalled at once the whole pool
+deadlocked behind them. The endpoint had already shown it can hang (see #6,
+where three models timed out at 25 s).
+
+**Fix.** `LLMClient` now sets a bounded per-request timeout
+(`LLM_TIMEOUT_SECONDS`, default 90) and `max_retries=0` on the SDK, so retries
+and backoff happen in one place — our own loop — instead of being silently
+multiplied by the SDK's.
+
+The run was killed and restarted at `LLM_TIMEOUT_SECONDS=60 --workers 10`, and
+produced its first scored examples within 45 seconds.
+
+**Lesson.** Every network call in a batch job needs a timeout smaller than your
+patience. A default that is technically finite is not the same as bounded.
+
+---
+
+## 13. One judgement in the final run was lost to a truncated JSON payload
+
+**Symptom.** In the measured 40-example run, exactly one row failed:
+
+```
+judge_failed: ValueError: no JSON object found in judge response:
+'{"task_fulfillment":5,"action_alignment":2,"completeness":4,"tone":5,
+  "critical_error":false,"acceptable":true,"reason":"The reply acknowledges
+  the adjustments and offers to review and confirm, but it '
+```
+
+The verdict was well-formed right up to the point where the model hit the token
+ceiling in the middle of `reason`, leaving unterminated JSON.
+
+**What happened next is the point.** The row was written to `per_response.csv`
+with its `error` populated, excluded from every mean, and surfaced in
+`metrics.json` as `main_n_failed: 1` and in the README table. The reported
+`n_examples` is **39**, not 40. Nothing was defaulted, back-filled or rounded up.
+
+**Why not just salvage it?** We could repair truncated JSON, or ask for `reason`
+last and parse partial objects. Both are reasonable. Neither was done under time
+pressure, because the failure mode is *loud and rare* (1 in 80 judgements) and
+the alternative — quietly inventing a verdict to keep n at 40 — is the exact
+behaviour that makes an evaluation harness untrustworthy.
+
+**Would fix next:** cap `reason` length in the judge prompt and retry once on a
+truncation-shaped parse error.
+
+---
+
 ## Things deliberately not done
 
 - **No FAISS / vector DB / LangChain / LlamaIndex.** 9.5 k documents is a single

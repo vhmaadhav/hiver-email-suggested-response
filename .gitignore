@@ -28,3 +28,6 @@ dist/
 Thumbs.db
 .vscode/
 .idea/
+
+# local run logs
+eval_run.log

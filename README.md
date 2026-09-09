@@ -5,6 +5,31 @@ Given a new incoming email, retrieve the most similar historical email/reply pai
 ## Results
 
 <!--RESULTS_TABLE-->
+Measured on **39 held-out examples** (seed 13, never seen by retrieval). Every value below is read directly from [`results/metrics.json`](results/metrics.json).
+
+| Metric | Main (retrieval + LLM) | Baseline (copy nearest reply) |
+|---|---:|---:|
+| **Overall score** (0-100) | **61.6** | 11.4 |
+| Judge score (0-100) | 72.5 | 6.5 |
+| Semantic similarity (0-100) | 36.3 | 23.1 |
+| Acceptable rate | 77% | 2% |
+| Critical-error rate | 23% | 85% |
+| **Main − Baseline** (overall) | **+50.2** | |
+
+Rubric dimensions for the main system (mean, 1-5):
+
+| task_fulfillment | action_alignment | completeness | tone |
+|---:|---:|---:|---:|
+| 4.2 | 3.6 | 3.8 | 4.6 |
+
+Generation `openai/gpt-oss-20b` · judge `openai/gpt-oss-20b` · semantic `sentence-transformers/all-MiniLM-L6-v2` (sentence-transformers) · corpus 9531 emails · runtime 313.7s on CPU.
+
+`main_n_failed = 1` row(s) errored and are excluded from the means rather than silently defaulted.
+
+> **Judge caveat.** Generation and judging use the same model here, which invites self-preference bias. See §13. The baseline is scored by the identical judge, so the *difference* is more trustworthy than either absolute number.
+
+Human validation: no manual ratings recorded yet — `results/human_validation.csv` is an empty template, and no labels are invented to fill it (§12).
+<!--/RESULTS_TABLE-->
 
 ## Run it
 
@@ -69,6 +94,7 @@ These matter and should not be glossed over.
 - **~2001 vintage.** Conventions, tooling and tone have moved on.
 - **A reply is not proof of resolution.** The dataset records what was sent, not whether it solved anything. A reference reply is evidence of *one plausible answer*, which is precisely why the evaluator treats it as one valid answer rather than as ground truth.
 - **Missing thread context.** Many replies depend on prior messages, attachments or hallway conversations the model cannot see. Some references are unreproducible from the incoming email alone — this puts a real ceiling on achievable scores and is a reason to read the per-dimension breakdown, not just the headline.
+- **The corpus is noisy.** Retrieval on the demo query surfaced an off-topic, crude message inside the top 3 — real unfiltered workplace mail. A production system would need content filtering on the retrieval corpus before anything reaches a drafting prompt.
 - **Real people's private mail,** made public through litigation. Used here strictly as a research corpus.
 
 ## 4. Architecture
@@ -103,6 +129,19 @@ The retrieved pairs go into the prompt as guidance. The prompt instructs the mod
 `new email → nearest TF-IDF historical email → return that human reply verbatim.`
 
 Both systems are scored by the identical evaluator on the identical examples. This is the comparison that makes the headline number mean something: it answers **"does LLM synthesis actually beat copying the closest previous answer?"** — the question a reviewer should ask of any RAG system. Without it, a good-looking absolute score is unfalsifiable.
+
+### A worked example (real output from `run_demo.py`)
+
+Incoming: *"Could you send me the revised deck before tomorrow?"*
+
+Top TF-IDF neighbour (similarity 0.313) — *"Can you please send revised confirm to me this evening also?"* — whose human reply was:
+
+> **Baseline (copied verbatim):** "Attached is a clean and redline of the revised confirm."
+
+> **Main system (grounded generation):** "Sure, I'll have the revised deck to you by the end of today."
+
+The baseline **claims an attachment that does not exist**. It is fluent, it is a real human reply, and it is unsendable — exactly the `critical_error` the rubric caps at 40, and exactly the failure mode a word-overlap metric would score well. The generated reply commits to the right action and fabricates nothing. This single example is the argument for both the baseline comparison and the critical-error cap, and it generalises: the baseline's critical-error rate is **85%** against the main system's **23%**.
+
 
 ## 7. What "accuracy" means for an email response
 

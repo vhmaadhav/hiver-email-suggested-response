@@ -226,3 +226,24 @@ def test_human_validation_computes_spearman_and_agreement(tmp_path):
     assert out["status"] == "ok" and out["n_rated"] == 3
     assert out["spearman_rho"] == pytest.approx(1.0)
     assert out["acceptable_agreement"] == pytest.approx(1.0)
+
+
+# --- leaked chain-of-thought guard ---------------------------------------
+def test_generator_drops_leaked_chain_of_thought(synthetic_pairs):
+    """A scratchpad must never be passed off as a suggested reply."""
+    leaked = ("Here's a thinking process:\n1. **Analyze the User's Request:**\n"
+              "   - I need to draft a reply...")
+    gen = SuggestedReplyGenerator(TfidfRetriever(synthetic_pairs), fake_client(leaked))
+    assert gen.generate("invoice payment billing").reply == ""
+
+
+def test_generator_keeps_text_after_think_tag(synthetic_pairs):
+    client = fake_client("<think>weighing the options</think>\nThanks - confirmed for Monday.")
+    gen = SuggestedReplyGenerator(TfidfRetriever(synthetic_pairs), client)
+    assert gen.generate("invoice payment billing").reply == "Thanks - confirmed for Monday."
+
+
+def test_generator_keeps_a_normal_reply_untouched(synthetic_pairs):
+    client = fake_client("Thanks for the note. I'll send the deck tonight.")
+    gen = SuggestedReplyGenerator(TfidfRetriever(synthetic_pairs), client)
+    assert gen.generate("send the deck").reply == "Thanks for the note. I'll send the deck tonight."
