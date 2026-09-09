@@ -295,13 +295,59 @@ This is the check that the evaluator is worth trusting. An automatic metric is o
 
 ## 13. Limitations of LLM-as-a-judge
 
-**LLM judges are imperfect and carry known biases** — verbosity bias (longer answers read as better), position and self-preference bias, sensitivity to prompt phrasing, and imperfect run-to-run consistency. Judge temperature is 0 here, which reduces but does not eliminate variance.
+**LLM judges are imperfect and carry known biases** — verbosity bias (longer answers read as better), position and self-preference bias, sensitivity to prompt phrasing, and imperfect run-to-run consistency. Judge temperature is 0 here, which reduces but does not eliminate variance: measured test-retest disagreement is **12.6 points mean absolute difference** (see the reliability section above).
 
 **Generation and judging currently use the same model** (`openai/gpt-oss-20b`). This is a genuine limitation and it is not a design preference: of twelve models probed on this endpoint, only two were reachable, and the other could neither return clean prose nor emit valid JSON (see [FAILURES.md](FAILURES.md) §6–9). A model evaluating its own output invites self-preference bias, which likely inflates the main system's scores relative to the baseline's. **In a production evaluation, use a different model — ideally a different vendor — for judging.** The code already supports this: set `JUDGE_MODEL` to something else. `metrics.json` records `config.same_model_for_gen_and_judge` so no reader has to take this on trust.
 
 Two further guards: the baseline is judged by the identical judge on the identical examples, so shared bias affects both sides of the comparison and the *difference* is more trustworthy than either absolute; and the deterministic semantic signal keeps 30% of the score outside the judge's reach entirely.
 
 The judge is a screening instrument, not a source of truth. That is what §12 is for.
+
+### Measured: how reliable is the judge itself? (`scripts/judge_reliability.py`)
+
+"LLM judges are imperfect" is a disclaimer. This measures it. 24 already-scored
+responses were re-judged with **identical inputs at temperature 0**, so every
+disagreement is irreducible sampling noise in the judge. Read from
+[`results/judge_reliability.json`](results/judge_reliability.json):
+
+| | |
+|---|---:|
+| Mean absolute difference between the two verdicts | **12.6 points** |
+| Median / max absolute difference | 5 / 61 points |
+| Correlation between runs (Pearson r) | 0.75 |
+| Identical score | 29% |
+| Within 10 points | 58% |
+| `acceptable` flag agreement | 88% |
+| `critical_error` flag agreement | 83% |
+
+**This is the single most important caveat in the repo, and it is measured
+rather than asserted.** At temperature 0 the judge reproduces its own score
+exactly only 29% of the time, and once disagreed with itself by 61 points.
+Correlation of 0.75 means it is clearly tracking something real — it is not
+noise — but a single per-response judge score should be read as an estimate
+with a ±13-point error bar, not a measurement.
+
+**It also independently corroborates the hybrid result.** A per-response noise
+floor of 12.6 points implies a run-level standard error of roughly
+12.6/√39 ≈ **2.0 points** from judge noise alone. The hybrid-vs-TF-IDF
+difference was **+1.65** — smaller than the judge's own noise floor. Two
+independent arguments, one statistical and one from measured instrument
+reliability, reach the same conclusion: that difference is not real.
+
+**What this means for reading the headline table.** The +1.6-point gap between
+retrievers is noise; the **+50-point gap between the main system and the
+baseline is far outside it** and is a real effect. The instrument is precise
+enough for the comparison this project actually makes, and not precise enough
+for fine-grained ranking — which is worth knowing before trusting any future
+small improvement.
+
+**How to reduce it:** average 3 judge samples per response (cuts noise ~√3),
+use a stronger judge model, and rate examples by hand (§12). The flag
+agreements (88% / 83%) are meaningfully higher than the score agreement,
+which suggests the binary decisions are the more trustworthy output — an
+argument for treating `acceptable` as the operational metric and the 0-100
+score as a soft ranking signal.
+
 
 ## 14. Tradeoffs
 

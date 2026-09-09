@@ -1,0 +1,25 @@
+{
+  "n_rejudged": 24,
+  "n_failed": 0,
+  "judge_model": "openai/gpt-oss-20b",
+  "temperature": 0.0,
+  "mean_judge_score_run1": 73.33,
+  "mean_judge_score_run2": 80.16,
+  "mean_signed_difference": 6.82,
+  "mean_absolute_difference": 12.55,
+  "median_absolute_difference": 5.0,
+  "max_absolute_difference": 61.25,
+  "pearson_r": 0.7522,
+  "spearman_rho": 0.7519,
+  "identical_score_rate": 0.2917,
+  "within_10_points_rate": 0.5833,
+  "acceptable_flag_agreement": 0.875,
+  "critical_error_flag_agreement": 0.8333,
+  "mean_abs_dimension_delta_1_to_5": {
+    "task_fulfillment": 0.417,
+    "action_alignment": 0.75,
+    "completeness": 0.5,
+    "tone": 0.167
+  },
+  "interpretation": "Mean absolute difference is the judge's own noise floor on a single response at temperature 0. A run-level difference much smaller than this divided by sqrt(n) should not be treated as a real effect."
+}
